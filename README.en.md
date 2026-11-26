@@ -47,6 +47,9 @@ Write these in `[params.glAdmin]` in `hugo.toml`. Omitted items use their defaul
 | `adminImagesURL` | `/admin/images/` | The URL of image management |
 | `postURL` | `/posts/{slug}/` | The URL pattern for posts. Replaces `{slug}` (file name), `{name}` (name without the leading date), `{yyyy}`, `{mm}` and `{dd}`. Used by the pending display |
 | `lang` | the first part of `languageCode` (`en-us` → `en`) | The language of the admin screens. Falls back to `en` when there is no dictionary. Dictionaries are in `data/gl-admin/i18n/<lang>.toml` |
+| `siteRepo` | none | The site repository (`group/subgroup/project`) where `/admin/settings/` writes the site settings |
+| `siteBranch` | `main` | The branch of the site repository |
+| `siteConfigPath` | `hugo.toml` | The Hugo configuration file in the site repository |
 | `tokenProvider` | none | The URL of a module that provides the GitLab token (provided by the site). The module exports `async function getGitLabToken()` and returns a token string or null. The token is cleared when the tab closes (sessionStorage). Without it, you log in with an access token |
 
 To change the URLs of the admin screens, put a `content/*.md` with the same path in the site, override `url:`, and set the same URL in these items.
@@ -56,6 +59,18 @@ To change the URLs of the admin screens, put a `content/*.md` with the same path
   repo = "owner/articles"
   branch = "main"
 ```
+
+### Admin screens (`/admin/`)
+
+The admin screens switch between posts, images and site settings with a shared navigation.
+
+- `/admin/`: bulk management of posts
+- `/admin/images/`: image management
+- `/admin/settings/`: the blog name, favicon and default thumbnail for post cards
+
+The site settings change the blog name (`title` and `params.headerTitle`), the favicon and the default thumbnail. Images are uploaded to `static/`, and the settings in `hugo.toml` are updated. Changes are committed to GitLab and take effect after the site is rebuilt.
+
+An access token with the `api` scope that can push to the target branch of the site repository is required. The token is stored in this tab's `sessionStorage`.
 
 ### Overriding messages
 
