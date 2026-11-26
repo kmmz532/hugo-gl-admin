@@ -62,7 +62,7 @@ hugo mod get github.com/kmmz532/hugo-gl-admin@v0.1.0
 
 サイト設定ではブログ名（`title`・`params.headerTitle`）、ファビコン、デフォルトサムネイルを変更できる。画像は `static/` にアップロードし、`hugo.toml` の設定を更新する。変更はGitLabにコミットされ、サイトの再ビルド後に反映される。
 
-サイト本体リポジトリの対象ブランチへプッシュできる、`api` スコープのアクセストークンが必要で、トークンはこのタブの `sessionStorage` に保存する。旧 `/admin2/` は `/admin/settings/` に転送する。
+サイト本体リポジトリの対象ブランチへプッシュできる、`api` スコープのアクセストークンが必要で、トークンはこのタブの `sessionStorage` に保存する。
 
 ### 文言の上書き
 

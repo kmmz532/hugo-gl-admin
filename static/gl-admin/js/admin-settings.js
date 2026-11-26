@@ -5,7 +5,7 @@ import { t } from './i18n.js';
 const $ = (id) => document.getElementById(id);
 const settings = JSON.parse($('admin-settings-config').textContent);
 const API = `${GITLAB_URL}/api/v4`;
-const TOKEN_KEY = 'gl_admin2_token';
+const TOKEN_KEY = 'gl_admin_settings_token';
 let token = sessionStorage.getItem(TOKEN_KEY) || getToken() || '';
 let configFile = null;
 
