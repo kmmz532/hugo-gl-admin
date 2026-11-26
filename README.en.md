@@ -1,3 +1,5 @@
+- Archived because it has been integrated into hugo-gh-admin
+
 # hugo-gl-admin
 
 A Hugo Module that adds a browser-based editor for the Markdown posts on GitLab to a Hugo site. It is the GitLab version of [hugo-gh-admin](https://github.com/kmmz532/hugo-gh-admin). It includes login, creating and editing posts, and the admin screens. (Japanese version: [README.md](README.md))

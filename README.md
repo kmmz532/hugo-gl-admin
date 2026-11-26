@@ -1,3 +1,5 @@
+- hugo-gh-adminに統合したため、アーカイブ済み
+
 # hugo-gl-admin
 Hugoで作成したサイトにGitLab上のMarkdown記事をブラウザから編集する機能を追加するHugo Modulesのモジュールです。ログイン、記事の新規作成と編集、管理画面などを含みます。[hugo-gh-admin](https://github.com/kmmz532/hugo-gh-admin) のGitLab版です。
 
