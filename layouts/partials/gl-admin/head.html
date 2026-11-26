@@ -1,0 +1,5 @@
+{{- /* 管理画面の <head> 部品。本体の head.html から呼ぶ。CSP の送り先は csp.html */ -}}
+<meta name="gl-admin" content="{{ partial "gl-admin/settings.html" . }}">
+{{- $css := resources.Get "gl-admin/editor.css" | minify | fingerprint }}
+<link rel="stylesheet" href="{{ $css.RelPermalink }}" integrity="{{ $css.Data.Integrity }}">
+<script type="module" src="{{ "gl-admin/js/admin.js" | relURL }}"></script>

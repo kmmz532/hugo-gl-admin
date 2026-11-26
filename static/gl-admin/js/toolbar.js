@@ -1,0 +1,198 @@
+// 本文欄のツールバーと、画像の 3 経路（ボタン・貼り付け・ドロップ）。
+// 画像は upload で保存し、仮テキストを置いてから実 URL に差し替える。失敗したら仮テキストを消す。
+import { t } from './i18n.js';
+
+let uploadCount = 0;
+
+function wrapSelection(textarea, before, after, fallback) {
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const selected = textarea.value.slice(start, end) || fallback;
+  textarea.setRangeText(before + selected + after, start, end, 'end');
+  textarea.setSelectionRange(start + before.length, start + before.length + selected.length);
+}
+
+function prefixLine(textarea, prefix) {
+  const start = textarea.selectionStart;
+  const lineStart = textarea.value.lastIndexOf('\n', start - 1) + 1;
+  textarea.setRangeText(prefix, lineStart, lineStart, 'end');
+}
+
+const ACTIONS = {
+  bold: (ta) => wrapSelection(ta, '**', '**', t('toolbar.bold')),
+  italic: (ta) => wrapSelection(ta, '*', '*', t('toolbar.italic')),
+  heading: (ta) => prefixLine(ta, '## '),
+  link: (ta) => wrapSelection(ta, '[', '](https://)', t('toolbar.link')),
+  list: (ta) => prefixLine(ta, '- '),
+  quote: (ta) => prefixLine(ta, '> '),
+  code: (ta) => {
+    const multiline = ta.value.slice(ta.selectionStart, ta.selectionEnd).includes('\n');
+    if (multiline) wrapSelection(ta, '```\n', '\n```', t('toolbar.code'));
+    else wrapSelection(ta, '`', '`', t('toolbar.code'));
+  },
+};
+
+function imageFile(list) {
+  return [...(list ?? [])].find((file) => file.type.startsWith('image/')) ?? null;
+}
+
+export function altFrom(file) {
+  return file.name ? file.name.replace(/\.[^.]+$/, '').replace(/[[\]|]/g, '') : t('toolbar.default_alt');
+}
+
+// 表示幅（px）は alt の末尾に |数字 で付ける。空なら元のまま
+export const withWidth = (alt, width) => (width ? `${alt}|${width}` : alt);
+
+// 本文欄から外れたときのカーソル位置。外れている間に入れる画像は、ここに置く
+const lastCaret = new WeakMap();
+
+// 一度も触っていない本文欄は先頭（0）に戻っていることがあるので、位置が無ければ末尾に置く
+function restoreCaret(textarea) {
+  if (document.activeElement === textarea) return;
+  const { length } = textarea.value;
+  const [start, end] = lastCaret.get(textarea) ?? [length, length];
+  textarea.setSelectionRange(Math.min(start, length), Math.min(end, length));
+}
+
+// 画像は単独の段落にする。前後が文字や別の画像と同じ行に続かないよう、空行を足して選択範囲に置く
+// caret を渡したときは、その位置（貼り付けた時点の選択範囲）に置く
+function insertBlock(textarea, text, caret = null) {
+  if (caret) textarea.setSelectionRange(caret[0], caret[1]);
+  else restoreCaret(textarea);
+  const { value, selectionStart: start, selectionEnd: end } = textarea;
+  const gap = (side, edge) => {
+    if (side === '') return '';
+    const run = (side.match(edge)?.[0] ?? '').length;
+    return '\n'.repeat(Math.max(0, 2 - run));
+  };
+  const before = gap(value.slice(0, start), /\n*$/);
+  const after = gap(value.slice(end), /^\n*/);
+  textarea.setRangeText(before + text + after, start, end, 'end');
+  if (after) textarea.setSelectionRange(start + before.length + text.length, start + before.length + text.length);
+  // 本文欄にフォーカスが無いまま続けて入れても、直前の画像の後ろに置く
+  lastCaret.set(textarea, [textarea.selectionStart, textarea.selectionEnd]);
+}
+
+// 仮テキストを置き、保存が終わったら差し替える。すべて textarea の input イベントで通知する
+async function insertImage(textarea, file, upload, onError, width = '', caret = null) {
+  // 仮テキストに番号を付け、同時に複数の画像を貼っても差し替え先を取り違えないようにする
+  const placeholder = `![${t('toolbar.uploading', { n: ++uploadCount })}]()`;
+  insertBlock(textarea, placeholder, caret);
+  textarea.dispatchEvent(new Event('input', { bubbles: true }));
+
+  const alt = withWidth(altFrom(file), width);
+  const replaceWith = (text) => {
+    const index = textarea.value.indexOf(placeholder);
+    if (index === -1) return;
+    textarea.setRangeText(text, index, index + placeholder.length, 'end');
+    if (document.activeElement !== textarea) lastCaret.set(textarea, [textarea.selectionStart, textarea.selectionEnd]);
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+
+  try {
+    const url = await upload(file);
+    replaceWith(`![${alt}](${url})`);
+  } catch (error) {
+    replaceWith('');
+    onError(error.message);
+  }
+}
+
+// X（旧 Twitter）の投稿の URL。埋め込み記法にする
+const TWEET_URL = /^https:\/\/(?:x|twitter)\.com\/[A-Za-z0-9_]{1,15}\/status\/\d+/;
+
+// 1 行の URL だけ（前後の空白は可）。" を含むと記法が壊れるので除く
+const URL_ONLY = /^\s*(https?:\/\/[^\s"]+)\s*$/;
+
+// execCommand で入れると、ブラウザの undo に載る（value に代入すると undo が効かない）
+function insertText(textarea, text) {
+  document.execCommand('insertText', false, text);
+  textarea.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+// URL を入れてから、その URL をカード記法に置き換える。2 回に分けるので、Ctrl+Z 1 回で URL に戻る
+function insertCardFromUrl(textarea, url) {
+  const start = textarea.selectionStart;
+  insertText(textarea, url);
+  textarea.setSelectionRange(start, start + url.length);
+  const name = TWEET_URL.test(url) ? 'tweet' : 'link-card';
+  insertText(textarea, `{{< ${name} url="${url}" >}}`);
+}
+
+// 本文のカーソル位置に画像を入れる（画像の一覧から選んだとき・一覧から上げたとき）
+export function insertImageMarkdown(textarea, url, alt = t('toolbar.default_alt'), width = '') {
+  insertBlock(textarea, `![${withWidth(alt, width)}](${url})`);
+  textarea.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+export function attachToolbar({ textarea, toolbar, fileInput, upload, onError, confirmUpload = async () => '' }) {
+  textarea.addEventListener('blur', () => lastCaret.set(textarea, [textarea.selectionStart, textarea.selectionEnd]));
+
+  // 貼り付け・ドロップは誤爆しやすいので、上げる前に確認する。画像ボタンは自分でファイルを選ぶので確認しない
+  async function insertConfirmed(file) {
+    // 確認の間に選択範囲が変わっても、貼り付けた時点の位置に入れる（確認の後で先頭に入る不具合の対策）
+    const caret = [textarea.selectionStart, textarea.selectionEnd];
+    // 確認の戻り値は表示幅（'' は元のまま）。やめるなら null
+    const width = await confirmUpload(file);
+    if (width !== null) insertImage(textarea, file, upload, onError, width, caret);
+    textarea.focus();
+  }
+
+  toolbar.addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-action]');
+    if (!button) return;
+    const action = button.dataset.action;
+    if (action === 'image') {
+      fileInput.click();
+      return;
+    }
+    ACTIONS[action]?.(textarea);
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    textarea.focus();
+  });
+
+  // 本文欄の中のショートカット（ツールバーの title に書いたもの）。Ctrl+S・Ctrl+Enter は editor.js
+  const SHORTCUTS = { b: 'bold', i: 'italic', k: 'link' };
+  textarea.addEventListener('keydown', (event) => {
+    if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
+    const action = SHORTCUTS[event.key.toLowerCase()];
+    if (!action) return;
+    event.preventDefault();
+    ACTIONS[action](textarea);
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files?.[0];
+    fileInput.value = '';
+    if (file) insertImage(textarea, file, upload, onError);
+  });
+
+  // テキストの貼り付けは通常どおり。画像と URL 1 つだけのときは横取りする
+  textarea.addEventListener('paste', (event) => {
+    const file = imageFile(event.clipboardData?.files);
+    if (file) {
+      event.preventDefault();
+      insertConfirmed(file);
+      return;
+    }
+    const url = URL_ONLY.exec(event.clipboardData?.getData('text/plain') ?? '')?.[1];
+    if (!url) return;
+    event.preventDefault();
+    insertCardFromUrl(textarea, url);
+  });
+
+  textarea.addEventListener('dragover', (event) => {
+    if (!imageFile(event.dataTransfer?.files)) return;
+    event.preventDefault();
+    textarea.classList.add('dragover');
+  });
+  textarea.addEventListener('dragleave', () => textarea.classList.remove('dragover'));
+  textarea.addEventListener('drop', (event) => {
+    textarea.classList.remove('dragover');
+    const file = imageFile(event.dataTransfer?.files);
+    if (!file) return;
+    event.preventDefault();
+    insertConfirmed(file);
+  });
+}

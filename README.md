@@ -1,0 +1,155 @@
+# hugo-gl-admin
+Hugoで作成したサイトにGitLab上のMarkdown記事をブラウザから編集する機能を追加するHugo Modulesのモジュールです。ログイン、記事の新規作成と編集、管理画面などを含みます。[hugo-gh-admin](https://github.com/kmmz532/hugo-gh-admin) のGitLab版です。
+
+- 保存先はGitLabのプロジェクト（gitlab.comとセルフホストのGitLab）。記事は `content/posts/<slug>.md` の形で保存します。
+- 画面の文言は日本語と英語に対応しています（`params.glAdmin.lang` で選びます）。英語版の説明は [README.en.md](README.en.md) を参照してください。
+
+## 必要なもの
+- Hugo 0.141.0以上のextended版
+- Go（Hugo Modulesの取り込みに利用する）
+- 記事を置くGitLabのプロジェクト（以下「記事のリポジトリ」）と、その対象ブランチへプッシュできるロールと `api` スコープを持つアクセストークン
+
+## 取り込み方
+
+本体の `go.mod` と `hugo.toml` に記述する。
+
+```toml
+[[module.imports]]
+  path = "github.com/kmmz532/hugo-gl-admin"
+```
+
+```sh
+hugo mod get github.com/kmmz532/hugo-gl-admin@v0.1.0
+```
+
+版はタグで固定する。`hugo mod get -u` で更新する前に、差分を確認する。
+
+## 設定（`params.glAdmin`）
+
+`hugo.toml` の `[params.glAdmin]` に書きます。省いた項目は既定値になります。既定値は `layouts/partials/gl-admin/settings.html` に1か所だけあります。
+
+| 項目 | 既定値 | 意味 |
+|---|---|---|
+| `gitlabURL` | `https://gitlab.com` | GitLabのURL。セルフホストのときはインスタンスのURLを書く |
+| `repo` | なし | 記事のリポジトリのフルパス（`group/subgroup/project`） |
+| `branch` | `main` | 記事を保存するブランチ |
+| `postsDir` | `content/posts` | 記事を置くフォルダ |
+| `imagesDir` | `static/images` | 画像を置くフォルダ |
+| `imagesURL` | `/images/` | 記事に書く画像のURLの前置き（`relURL` を通す） |
+| `defaultCategory` | `tech` | 新規記事の既定のカテゴリ |
+| `authorField` | `false` | `true` にすると、編集画面に作者の欄を出す。出さないサイトでは、記事の `author` をそのまま保持する |
+| `author` | （空） | 新規記事の既定の作者（GitLabのユーザー名）。編集画面で最後に保存した作者があれば、そちらを優先する |
+| `editURL` | `/edit/` | 編集画面のURL |
+| `loginURL` | `/login/` | ログイン画面のURL |
+| `adminURL` | `/admin/` | 一括管理のURL |
+| `adminImagesURL` | `/admin/images/` | 画像の管理のURL |
+| `postURL` | `/posts/{slug}/` | 記事のURLの形。`{slug}`（ファイル名）・`{name}`（先頭の日付を除いた名前）・`{yyyy}`・`{mm}`・`{dd}` を置き換える。反映待ちの表示で利用する |
+| `lang` | `languageCode` の先頭（`ja-jp` → `ja`） | 管理画面の文言の言語。辞書が無ければ `en`。辞書は `data/gl-admin/i18n/<lang>.toml` |
+| `siteRepo` | なし | `/admin/settings/` がサイト設定を書き込むサイト本体リポジトリのフルパス（`group/project`） |
+| `siteBranch` | `main` | サイト本体リポジトリのブランチ |
+| `siteConfigPath` | `hugo.toml` | サイト本体リポジトリ内の Hugo 設定ファイル |
+| `tokenProvider` | なし | GitLabのトークンを受け取るモジュールの URL（サイトが用意する）。モジュールは `export async function getGitLabToken()` を持ち、トークン（文字列）か null を返す。トークンはタブを閉じると消える（sessionStorage）。未設定ならアクセストークンでログインする |
+
+画面のURLを変えるときは、本体に同じパスの `content/*.md` を置いて `url:` を上書きし、この項目も同じURLに合わせます。
+
+### 管理画面（`/admin/`）
+
+管理画面は記事・画像・サイト設定を共通のナビゲーションで切り替える。
+
+- `/admin/`：記事の一括管理
+- `/admin/images/`：画像の管理
+- `/admin/settings/`：ブログ名・ファビコン・記事カード用デフォルトサムネイルの設定
+
+サイト設定ではブログ名（`title`・`params.headerTitle`）、ファビコン、デフォルトサムネイルを変更できる。画像は `static/` にアップロードし、`hugo.toml` の設定を更新する。変更はGitLabにコミットされ、サイトの再ビルド後に反映される。
+
+サイト本体リポジトリの対象ブランチへプッシュできる、`api` スコープのアクセストークンが必要で、トークンはこのタブの `sessionStorage` に保存する。旧 `/admin2/` は `/admin/settings/` に転送する。
+
+### 文言の上書き
+
+管理画面の文言は `data/gl-admin/i18n/<lang>.toml` にある。キーは `<画面>.<項目>` の 2 階層（例: `editor.publish`）。
+
+- 本体の `data/gl-admin/i18n/<lang>.toml` を置くと、モジュールのファイルより本体が優先される。ファイル単位で置き換わるため、一部のキーだけを変えるときも、そのファイルの全キーを書く。
+- 文字列の `{name}` は差し込みの値に置き換わる。書き換えるときも同じ名前を残す。
+- 管理画面のページ名（ブラウザのタブの `<title>`）は `content/*.md` の `title:` で決まる。モジュールの既定値は英語（`Admin` など）。日本語にするときは、本体に同じパスの `content/*.md` を置いて `title:` を書く（例: `content/admin.md` の `title: "一括管理"`）。
+
+## 本体（テーマ）との接点
+
+本体は次のpartialだけを呼びます。
+
+| partial | 呼ぶ場所 | 引数 | 役目 |
+|---|---|---|---|
+| `gl-admin/head.html` | `<head>`（CSSのbundleの後） | `.` | `<meta name="gl-admin">`、編集画面のCSS、`admin.js` |
+| `gl-admin/csp.html` | CSPの `script-src` を組むところ | `.` | そのページで足す送り先（編集画面だけcdnjs） |
+| `gl-admin/button.html` | ヘッダー・記事カード・フッター | `dict "kind" "edit\|new\|admin\|login\|logout\|footer" "page" . "class" "..." "label" "..." "text" true` | 管理画面への入口のボタン |
+| `gl-admin/article-scripts.html` | 記事詳細の `scripts` ブロック | `.` | コードのコピーボタンの読み込み |
+
+`csp.html` は `script-src` に足す値を返します。前に空白を付け、末尾に改行を出しません。
+
+## テーマが用意するもの（契約）
+
+### 反映待ちの雛形
+
+`<template id="gl-admin-pending-card">`（一覧のカード）と `<template id="gl-admin-pending-article">`（記事詳細）を、ページの `<body>` に出します。`pending.js` は雛形を複製し、次の要素に値を入れます。
+
+- `data-field="thumb|band|date|categories|title|external|source|summary|tags|edit|crumbs|body"`: 値を入れる要素。`textContent`・`src`・`href` だけを利用する。
+- `data-item="tag|crumb"`: 項目の数だけ複製される入れ子の雛形。
+- 差し込み先: 一覧は `[data-pending-target="list"]`、記事は `[data-pending-target="article"]`（404の箱）か `article[data-slug]`。
+
+記事の雛形の `data-field="edit"` は任意。置くと、その要素に編集画面へのURL（`href`）を入れる。
+
+雛形がないページでは、反映待ちの帯だけを出します。
+
+### クラス名とCSS変数
+
+- 見出しは `.page-title`、記事の見出しは `.post-title`、本文は `.post-body`。プレビューも同じクラスを利用する。
+- 編集画面のCSS（`assets/gl-admin/editor.css`）は次のCSS変数を利用する。本体のテーマで定義する。
+  `--text-primary`・`--text-secondary`・`--foreground`・`--foreground-rgb`・`--background`・`--border`・`--link`・`--danger`
+- 編集画面のプレビューの数式は `lib/marked.min.js`（本体の `static/lib/`）を読む。
+
+### 索引
+
+- 管理画面は `/gl-admin/index.json` を読む。1ファイル50件まで、`next` をたどる。項目は `slug`・`title`・`url`・`date`・`external`・`images`・`tags`・`categories`。
+- 検索用の `/index.json` は本体の担当。
+
+索引は次の 2 つの partial を読むため、テーマはこれを用意する。
+
+- `partials/external-meta.html`: 記事の `title`・`summary`・`image`・`images` を持つ dict を返す。`images` は外部記事の OGP 画像の候補（https のみ）の配列。
+- `partials/post-url.html`: 記事の URL を返す。外部記事（`external` あり）なら `external` の値、そうでなければ `.RelPermalink`。
+
+## フロントマター
+
+管理画面が読み書きするのは次の項目だけ。ほかの項目は消さずに残す。
+
+`title`・`date`・`lastmod`・`author`・`categories`・`tags`・`summary`・`image`・`aliases`・`external`・`source`・`build`・`sitemap`
+
+## 編集履歴
+
+編集画面の「履歴」は、記事ファイルのGitLabのコミット履歴を新しい順に出す。30件ずつ読み込み、「さらに読み込む」で続きを出す。
+
+- 名前の変更（slug の変更）はたどらない。変更後のパスの履歴だけが出る。slug を変えた記事の古いパスの履歴は出ない。
+- 保存していない変更（この端末の下書き）は出ない。
+- 新規記事はまだファイルが無いため、「まだ保存されていません」と出る。
+- 保存の直後はGitLabの一覧への反映が遅れることがあるため、先頭のページが空のときは2秒おきに最大3回取り直す。
+
+## 版の約束
+
+- 版は [Semantic Versioning](https://semver.org/lang/ja/) に従い、タグで示す（`v0.1.0` など）。
+- 次を変えるときはメジャー版を上げ、`CHANGELOG.md` に書く: `params.glAdmin` の項目、partialの名前と引数、雛形の `id` と `data-field`、CSS変数とクラス名、索引のJSONの形。
+- 契約に触れない修正は、マイナー版かパッチ版にする。
+
+## セキュリティ
+
+- アクセストークンはブラウザの `localStorage` に保存される。共有の端末では利用しない。
+- トークンは記事のリポジトリのプロジェクトアクセストークンにし、スコープは `api` だけを付ける。期限は90日以内にする。
+- 管理ボタンの表示などは利便性のためだけ。権限はGitLabが判定する。
+- 本体のContent-Security-Policyに、`csp.html` が返す送り先を含める。`connect-src` にはGitLabのURL（既定値は `https://gitlab.com`）を含める。
+- 画像の公開前の表示は `<gitlabURL>/<repo>/-/raw/...` を読み込むため、記事のリポジトリは公開（public）にする。
+
+## 見た目を変える
+
+記事の書式（ショートコード）の見た目を変えるときは、本体に同じ名前のファイルを置く（例: `layouts/shortcodes/*.html`）。上書きされる。
+
+## ライセンス
+
+MIT（[LICENSE](LICENSE)）。
+

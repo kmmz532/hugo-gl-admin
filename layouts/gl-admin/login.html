@@ -1,0 +1,23 @@
+{{ define "main" }}
+{{- $gl := partial "gl-admin/settings.html" . | transform.Unmarshal }}
+{{- $i18n := partial "gl-admin/i18n.html" . | transform.Unmarshal }}
+<h1 class="page-title">{{ $i18n.title.login }}</h1>
+<ol class="steps">
+  <li>{{ $i18n.login.step_create }}</li>
+  <li>{{ replace $i18n.login.step_repo "{repo}" (printf "<code>%s</code>" (path.Base $gl.repo)) | safeHTML }}</li>
+  <li>{{ replace $i18n.login.step_permissions "{permission}" "<strong>api</strong>" | safeHTML }}</li>
+  <li>{{ $i18n.login.step_expiry }}</li>
+</ol>
+<form id="login-form" class="login-form">
+  <label class="field">Access token
+    <input id="token" type="password" autocomplete="off" required></label>
+  <button type="submit" class="btn primary">{{ $i18n.common.login }}</button>
+  <p id="login-status" role="alert"></p>
+</form>
+<script type="application/json" id="gl-admin-messages">{{ partial "gl-admin/messages.html" $i18n | safeJS }}</script>
+{{ end }}
+
+
+{{ define "scripts" }}
+<script type="module" src="{{ "gl-admin/js/login.js" | relURL }}"></script>
+{{ end }}

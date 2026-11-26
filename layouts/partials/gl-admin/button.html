@@ -1,0 +1,40 @@
+{{- /* 管理画面への入口のボタン。引数: dict "kind" "edit|new|admin|login|logout|footer" "page" . "class" "..." "label" "..." "text" true（text を付けるとアイコンではなく文字で出す）。
+  本体の header.html・post-card.html・footer.html から呼ぶ。見た目のクラスは class で渡す。 */ -}}
+{{- $gl := partial "gl-admin/settings.html" .page | transform.Unmarshal -}}
+{{- $i18n := partial "gl-admin/i18n.html" .page | transform.Unmarshal -}}
+{{- $kind := .kind -}}
+{{- if eq $kind "footer" -}}
+<a id="auth-link" class="footer-admin" href="{{ $gl.loginURL }}">{{ $i18n.common.admin }}</a>
+{{- else -}}
+  {{- $cls := .class | default "icon-button" -}}
+  {{- $vis := "admin-only" -}}
+  {{- $href := $gl.adminURL -}}
+  {{- $label := .label | default $i18n.common.bulk_admin -}}
+  {{- $icon := "fa-solid fa-gear" -}}
+  {{- if eq $kind "edit" -}}
+    {{- $href = printf "%s?slug=%s" $gl.editURL (.page.File.ContentBaseName | urlquery) -}}
+    {{- $label = .label | default $i18n.common.edit_post -}}
+    {{- $icon = "fa-solid fa-pen" -}}
+  {{- else if eq $kind "new" -}}
+    {{- $href = $gl.editURL -}}
+    {{- $label = .label | default $i18n.common.new_post -}}
+    {{- $icon = "fa-solid fa-plus" -}}
+  {{- else if eq $kind "login" -}}
+    {{- $vis = "guest-only" -}}
+    {{- $href = $gl.loginURL -}}
+    {{- $label = .label | default $i18n.common.login -}}
+    {{- $icon = "fa-solid fa-right-to-bracket" -}}
+  {{- else if eq $kind "logout" -}}
+    {{- $vis = "logout-only" -}}
+    {{- $href = "#" -}}
+    {{- $label = .label | default $i18n.common.logout -}}
+    {{- $icon = "fa-solid fa-right-from-bracket" -}}
+  {{- end }}
+{{- if .text }}
+<a class="{{ $cls }} {{ $vis }}" href="{{ $href }}" hidden>{{ $label }}</a>
+{{- else }}
+<a class="{{ $cls }} {{ $vis }}" href="{{ $href }}" aria-label="{{ $label }}" title="{{ $label }}" hidden>
+  <i class="{{ $icon }}" aria-hidden="true"></i>
+</a>
+{{- end }}
+{{- end -}}

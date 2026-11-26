@@ -1,0 +1,62 @@
+{{ define "main" }}
+{{- $gl := partial "gl-admin/settings.html" . | transform.Unmarshal }}
+{{- $i18n := partial "gl-admin/i18n.html" . | transform.Unmarshal }}
+<h1 class="page-title">{{ $i18n.title.admin }}</h1>
+<nav class="admin-nav" aria-label="管理メニュー">
+  <a href="{{ $gl.adminURL }}"{{ if eq .Layout "admin" }} aria-current="page"{{ end }}>記事</a>
+  <a href="{{ $gl.adminImagesURL }}"{{ if eq .Layout "admin-images" }} aria-current="page"{{ end }}>画像</a>
+  <a href="{{ "admin/settings/" | relURL }}"{{ if eq .Layout "admin-settings" }} aria-current="page"{{ end }}>設定</a>
+</nav>
+<p class="admin-note">{{ $i18n.admin.note }}</p>
+
+<div class="admin-tools">
+  <input id="admin-search" type="search" placeholder="{{ $i18n.admin.search_placeholder }}" aria-label="{{ $i18n.admin.search_placeholder }}">
+  <select id="admin-kind" aria-label="{{ $i18n.admin.kind_filter_label }}">
+    <option value="all">{{ $i18n.admin.kind_all }}</option>
+    <option value="article">{{ $i18n.admin.kind_article }}</option>
+    <option value="external">{{ $i18n.admin.kind_external }}</option>
+  </select>
+  <span id="admin-count" class="admin-count" aria-live="polite"></span>
+</div>
+
+<div class="admin-table-wrap">
+  <table class="admin-table">
+    <thead>
+      <tr>
+        <th scope="col"><input id="admin-all" type="checkbox" aria-label="{{ $i18n.admin.select_all_label }}"></th>
+        <th scope="col">{{ $i18n.admin.col_date }}</th>
+        <th scope="col">{{ $i18n.admin.col_title }}</th>
+        <th scope="col">{{ $i18n.admin.col_kind }}</th>
+        <th scope="col">{{ $i18n.admin.col_category }}</th>
+        <th scope="col">{{ $i18n.admin.col_tags }}</th>
+        <th scope="col">{{ $i18n.admin.col_actions }}</th>
+      </tr>
+    </thead>
+    <tbody id="admin-rows"></tbody>
+  </table>
+</div>
+
+<section id="bulk-bar" class="bulk-bar" aria-label="{{ $i18n.admin.bulk_label }}" hidden>
+  <p id="bulk-count" class="bulk-count"></p>
+  <div class="bulk-controls">
+    <select id="bulk-action" aria-label="{{ $i18n.admin.bulk_label }}">
+      <option value="delete">{{ $i18n.admin.action_delete }}</option>
+      <option value="category">{{ $i18n.admin.action_category }}</option>
+      <option value="addTags">{{ $i18n.admin.action_add_tags }}</option>
+      <option value="removeTags">{{ $i18n.admin.action_remove_tags }}</option>
+    </select>
+    <select id="bulk-category" aria-label="{{ $i18n.admin.category_label }}" hidden></select>
+    <input id="bulk-tags" type="text" placeholder="{{ $i18n.admin.tags_placeholder }}" aria-label="{{ $i18n.admin.tags_placeholder }}" hidden>
+    <button type="button" id="bulk-apply" class="btn primary">{{ $i18n.admin.apply }}</button>
+  </div>
+  <p id="bulk-status" class="bulk-status" role="status"></p>
+</section>
+
+<p id="admin-status" class="bulk-status" role="status"></p>
+<script type="application/json" id="gl-admin-messages">{{ partial "gl-admin/messages.html" $i18n | safeJS }}</script>
+{{ end }}
+
+
+{{ define "scripts" }}
+<script type="module" src="{{ "gl-admin/js/admin-list.js" | relURL }}" data-index-url="{{ "gl-admin/index.json" | relURL }}"></script>
+{{ end }}
